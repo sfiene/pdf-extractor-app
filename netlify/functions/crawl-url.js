@@ -1,14 +1,15 @@
-// This function needs two dependencies: 'axios' for fetching the URL
-// and 'cheerio' for parsing the HTML. You'll need to add a 'package.json'
-// file to your project to manage these dependencies.
+// This function now uses Puppeteer to control a headless browser.
+// It can render JavaScript-heavy pages before finding the links.
 
-const axios = require('axios');
-const cheerio = require('cheerio');
+const puppeteer = require('puppeteer-core');
+const chromium = require('chrome-aws-lambda');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
+
+  let browser = null;
 
   try {
     const { url } = JSON.parse(event.body);
@@ -16,30 +17,53 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'URL is required' }) };
     }
 
-    // Fetch the HTML content of the page
-    const { data } = await axios.get(url);
-    const $ = cheerio.load(data);
-    const pdfUrls = new Set(); // Use a Set to avoid duplicates
+    // Launch the headless browser
+    browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath,
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
+    });
 
-    // Find all links and filter for PDFs
-    $('a').each((i, link) => {
-      const href = $(link).attr('href');
-      if (href && href.toLowerCase().endsWith('.pdf')) {
-        // Resolve relative URLs to absolute URLs
-        const absoluteUrl = new URL(href, url).href;
-        pdfUrls.add(absoluteUrl);
-      }
+    const page = await browser.newPage();
+
+    // Go to the URL and wait for the network to be idle
+    await page.goto(url, { waitUntil: 'networkidle2' });
+
+    // IMPORTANT: Wait for the specific table element to be rendered on the page.
+    // This is the key step to ensure the JavaScript has finished running.
+    await page.waitForSelector('#gvLoisSubmittals');
+
+    // Now that the table exists, extract all the PDF links from it.
+    const pdfUrls = await page.evaluate(() => {
+      // This code runs inside the browser context
+      const links = Array.from(document.querySelectorAll('#gvLoisSubmittals td.k-command-cell > a'));
+      const urls = new Set(); // Use a Set to avoid duplicates
+      
+      links.forEach(link => {
+        if (link.href && link.href.toLowerCase().includes('.pdf')) {
+          // The 'href' is already an absolute URL in this context
+          urls.add(link.href);
+        }
+      });
+      
+      return Array.from(urls);
     });
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ pdfUrls: Array.from(pdfUrls) }),
+      body: JSON.stringify({ pdfUrls }),
     };
   } catch (error) {
     console.error('Crawl Error:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to crawl the specified URL.' }),
+      body: JSON.stringify({ error: `Failed to crawl the specified URL. Error: ${error.message}` }),
     };
+  } finally {
+    if (browser !== null) {
+      await browser.close();
+    }
   }
 };
