@@ -26,12 +26,16 @@ exports.handler = async (event) => {
     });
 
     const page = await browser.newPage();
+    
+    // Set a realistic User-Agent to avoid being blocked by simple bot detectors
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
 
     // Go to the URL and wait for the network to be idle
-    await page.goto(url, { waitUntil: 'networkidle2' });
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 }); // Increased timeout for navigation
 
     // Wait for the specific table element to be rendered on the page.
-    await page.waitForSelector('#gvLoisSubmittals');
+    // Increased timeout to 60 seconds to allow for slow-loading pages.
+    await page.waitForSelector('#gvLoisSubmittals', { timeout: 60000 });
 
     // Now that the table exists, extract all the PDF links from it.
     const pdfUrls = await page.evaluate(() => {
@@ -53,6 +57,12 @@ exports.handler = async (event) => {
     };
   } catch (error) {
     console.error('Crawl Error:', error);
+    if (error.name === 'TimeoutError') {
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: `The page took too long to load or the required table (#gvLoisSubmittals) did not appear within 60 seconds.` }),
+        };
+    }
     return {
       statusCode: 500,
       body: JSON.stringify({ error: `Failed to crawl the specified URL. Error: ${error.message}` }),
