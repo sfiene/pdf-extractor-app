@@ -1,7 +1,7 @@
 [build]
   command = "npm install"
   functions = "netlify/functions"
-  publish = "." # This tells Netlify your index.html is in the root
+  publish = "."
 
 [[redirects]]
   from = "/api/*"
