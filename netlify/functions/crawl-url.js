@@ -1,4 +1,4 @@
-// This version uses a more accurate CSS selector to find the download links.
+// This version includes fixes for browser stability in a serverless environment.
 
 const chromium = require('@sparticuz/chromium');
 const puppeteer = require('puppeteer');
@@ -26,7 +26,7 @@ exports.handler = async (event) => {
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--single-process'
+        // '--single-process' // Removing this flag as it can sometimes cause instability.
     ];
 
     // Launch the headless browser with the compatibility flags
@@ -40,7 +40,8 @@ exports.handler = async (event) => {
 
     const page = await browser.newPage();
     
-    await page.setUserAgent('Mozilla/5.G (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
+    // Corrected a typo in the User-Agent string (5.G -> 5.0)
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
 
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
