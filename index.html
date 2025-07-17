@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Data Extractor with Excel Export</title>
+    <title>Advanced PDF Data Extractor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,12 +15,8 @@
             transition: all 0.2s ease-in-out;
         }
         .file-input-label.dragover {
-            border-color: #3b82f6; /* blue-500 */
-            background-color: #eff6ff; /* blue-50 */
-        }
-        #pdf-upload:focus + label {
-            outline: 2px solid #3b82f6;
-            outline-offset: 2px;
+            border-color: #3b82f6;
+            background-color: #eff6ff;
         }
         .spinner {
             border-top-color: #3498db;
@@ -31,7 +27,6 @@
                 transform: rotate(360deg);
             }
         }
-        /* Ensure table layout is consistent */
         table {
             table-layout: fixed;
             width: 100%;
@@ -40,7 +35,7 @@
             word-wrap: break-word;
         }
         .file-header-row td {
-            background-color: #e5e7eb; /* gray-200 */
+            background-color: #e5e7eb;
             font-weight: bold;
             padding: 0.75rem 1rem;
             text-align: center;
@@ -52,30 +47,46 @@
     <div class="w-full max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6 md:p-8">
         <div class="text-center mb-6">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Advanced PDF Data Extractor</h1>
-            <p class="text-gray-500 mt-2">Upload one or more PDF files to extract structured data.</p>
+            <p class="text-gray-500 mt-2">Upload PDFs directly or enter a URL to find and process PDF files.</p>
+        </div>
+
+        <!-- Input Tabs -->
+        <div class="mb-4 border-b border-gray-200">
+            <nav class="flex space-x-4" aria-label="Tabs">
+                <button id="tab-upload" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md border-b-2 border-blue-500">File Upload</button>
+                <button id="tab-url" class="text-gray-500 hover:text-gray-700 px-3 py-2 font-medium text-sm rounded-md border-b-2 border-transparent">Crawl URL</button>
+            </nav>
         </div>
 
         <!-- File Upload Section -->
-        <div class="mb-6">
+        <div id="upload-section" class="mb-6">
             <label for="pdf-upload" id="file-input-label" class="file-input-label flex justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer">
                 <span class="flex items-center space-x-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <span id="file-name" class="font-medium text-gray-600">
-                        Drop PDF files to Attach, or <span class="text-blue-600 underline">browse</span>
-                    </span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                    <span id="file-name" class="font-medium text-gray-600">Drop PDF files to Attach, or <span class="text-blue-600 underline">browse</span></span>
                 </span>
                 <input type="file" id="pdf-upload" class="hidden" accept=".pdf" multiple>
             </label>
         </div>
 
+        <!-- URL Crawl Section -->
+        <div id="url-section" class="mb-6 hidden">
+            <div class="flex items-center space-x-2">
+                <input type="url" id="url-input" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="https://example.com/reports">
+                <button id="crawl-btn" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300">Crawl</button>
+            </div>
+            <div id="crawled-files-container" class="mt-4 hidden">
+                <h3 class="text-lg font-medium mb-2">PDFs Found:</h3>
+                <div id="crawled-files-list" class="max-h-40 overflow-y-auto space-y-2 p-3 bg-gray-50 rounded-md border"></div>
+            </div>
+        </div>
+
         <!-- Action Buttons -->
         <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6">
-            <button id="extract-btn" class="w-full sm:w-auto bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-300" disabled>
+            <button id="extract-btn" class="w-full sm:w-auto bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:bg-gray-400" disabled>
                 Extract Data
             </button>
-            <button id="export-btn" class="w-full sm:w-auto bg-green-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 transition-all duration-300 hidden">
+            <button id="export-btn" class="w-full sm:w-auto bg-green-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 hidden">
                 Export to Excel (CSV)
             </button>
         </div>
@@ -86,9 +97,7 @@
                 <div id="spinner" class="spinner w-6 h-6 rounded-full border-4 border-gray-200 hidden"></div>
                 <p id="status-text" class="text-lg font-medium text-gray-700"></p>
             </div>
-            
             <div id="results-container" class="mt-6 hidden text-left">
-                <!-- People Table -->
                 <div class="overflow-x-auto">
                     <table id="results-table" class="min-w-full bg-white rounded-lg shadow">
                         <thead class="bg-gray-200">
@@ -103,9 +112,7 @@
                                 <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Location</th>
                             </tr>
                         </thead>
-                        <tbody id="results-tbody" class="divide-y divide-gray-200">
-                            <!-- Data rows will be injected here -->
-                        </tbody>
+                        <tbody id="results-tbody" class="divide-y divide-gray-200"></tbody>
                     </table>
                 </div>
                  <p id="no-people-found" class="text-gray-500 p-4 text-center hidden">No people were found in any of the documents.</p>
@@ -120,11 +127,19 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
 
         // DOM Elements
+        const tabUpload = document.getElementById('tab-upload');
+        const tabUrl = document.getElementById('tab-url');
+        const uploadSection = document.getElementById('upload-section');
+        const urlSection = document.getElementById('url-section');
         const pdfUpload = document.getElementById('pdf-upload');
         const fileInputLabel = document.getElementById('file-input-label');
+        const fileNameSpan = document.getElementById('file-name');
+        const urlInput = document.getElementById('url-input');
+        const crawlBtn = document.getElementById('crawl-btn');
+        const crawledFilesContainer = document.getElementById('crawled-files-container');
+        const crawledFilesList = document.getElementById('crawled-files-list');
         const extractBtn = document.getElementById('extract-btn');
         const exportBtn = document.getElementById('export-btn');
-        const fileNameSpan = document.getElementById('file-name');
         const statusContainer = document.getElementById('status-container');
         const statusText = document.getElementById('status-text');
         const spinner = document.getElementById('spinner');
@@ -135,41 +150,105 @@
         const noPeopleFound = document.getElementById('no-people-found');
 
         let selectedFiles = [];
+        let crawledPdfUrls = [];
+        let currentMode = 'upload'; // 'upload' or 'url'
 
-        // --- File Handling ---
+        // --- Tab Switching Logic ---
+        function switchTab(mode) {
+            currentMode = mode;
+            if (mode === 'upload') {
+                tabUpload.classList.add('border-blue-500', 'text-gray-800');
+                tabUpload.classList.remove('border-transparent', 'text-gray-500');
+                tabUrl.classList.add('border-transparent', 'text-gray-500');
+                tabUrl.classList.remove('border-blue-500', 'text-gray-800');
+                uploadSection.classList.remove('hidden');
+                urlSection.classList.add('hidden');
+            } else {
+                tabUrl.classList.add('border-blue-500', 'text-gray-800');
+                tabUrl.classList.remove('border-transparent', 'text-gray-500');
+                tabUpload.classList.add('border-transparent', 'text-gray-500');
+                tabUpload.classList.remove('border-blue-500', 'text-gray-800');
+                urlSection.classList.remove('hidden');
+                uploadSection.classList.add('hidden');
+            }
+            validateInputs();
+        }
+        tabUpload.addEventListener('click', () => switchTab('upload'));
+        tabUrl.addEventListener('click', () => switchTab('url'));
+
+        // --- File & URL Handling ---
+        function validateInputs() {
+            const hasUploads = selectedFiles.length > 0;
+            const hasCrawledUrls = crawledPdfUrls.length > 0;
+            extractBtn.disabled = !(hasUploads || hasCrawledUrls);
+        }
 
         function handleFiles(files) {
             selectedFiles = Array.from(files).filter(file => file.type === 'application/pdf');
-            
             if (selectedFiles.length > 0) {
                 fileNameSpan.textContent = `${selectedFiles.length} PDF file(s) selected`;
-                extractBtn.disabled = false;
                 errorContainer.classList.add('hidden');
             } else {
                 showError("No valid PDF files selected.");
                 fileNameSpan.innerHTML = `Drop PDF files to Attach, or <span class="text-blue-600 underline">browse</span>`;
-                extractBtn.disabled = true;
             }
+            validateInputs();
         }
 
         pdfUpload.addEventListener('change', (event) => handleFiles(event.target.files));
-        fileInputLabel.addEventListener('dragover', (event) => {
-            event.preventDefault();
-            fileInputLabel.classList.add('dragover');
-        });
+        fileInputLabel.addEventListener('dragover', (event) => { event.preventDefault(); fileInputLabel.classList.add('dragover'); });
         fileInputLabel.addEventListener('dragleave', () => fileInputLabel.classList.remove('dragover'));
-        fileInputLabel.addEventListener('drop', (event) => {
-            event.preventDefault();
-            fileInputLabel.classList.remove('dragover');
-            handleFiles(event.dataTransfer.files);
+        fileInputLabel.addEventListener('drop', (event) => { event.preventDefault(); fileInputLabel.classList.remove('dragover'); handleFiles(event.dataTransfer.files); });
+
+        // --- Crawling Logic ---
+        crawlBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            if (!url) {
+                showError("Please enter a valid URL.");
+                return;
+            }
+            
+            crawlBtn.disabled = true;
+            statusText.textContent = `Crawling ${url} for PDF links...`;
+            statusContainer.classList.remove('hidden');
+            spinner.classList.remove('hidden');
+            errorContainer.classList.add('hidden');
+            crawledFilesContainer.classList.add('hidden');
+            crawledFilesList.innerHTML = '';
+
+            try {
+                const response = await fetch('/api/crawl-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || `Failed to crawl URL with status ${response.status}`);
+                }
+                const { pdfUrls } = await response.json();
+                crawledPdfUrls = pdfUrls;
+                
+                if (crawledPdfUrls.length > 0) {
+                    crawledFilesList.innerHTML = crawledPdfUrls.map(pdfUrl => `<div class="p-2 bg-white rounded border">${pdfUrl.split('/').pop()}</div>`).join('');
+                    crawledFilesContainer.classList.remove('hidden');
+                } else {
+                    crawledFilesList.innerHTML = `<div class="p-2 text-gray-500">No PDF links found on that page.</div>`;
+                    crawledFilesContainer.classList.remove('hidden');
+                }
+                validateInputs();
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                spinner.classList.add('hidden');
+                statusText.textContent = '';
+                crawlBtn.disabled = false;
+            }
         });
 
-        // --- Main Logic ---
 
+        // --- Main Extraction Logic ---
         extractBtn.addEventListener('click', async () => {
-            if (selectedFiles.length === 0) return;
-            
-            // Reset UI
             extractBtn.disabled = true;
             exportBtn.classList.add('hidden');
             statusContainer.classList.remove('hidden');
@@ -180,49 +259,45 @@
             noPeopleFound.classList.add('hidden');
             let totalPeopleFound = 0;
 
-            for (let i = 0; i < selectedFiles.length; i++) {
-                const file = selectedFiles[i];
+            const tasks = [];
+            if (currentMode === 'upload') {
+                selectedFiles.forEach(file => tasks.push({ type: 'file', data: file, name: file.name }));
+            } else {
+                crawledPdfUrls.forEach(url => tasks.push({ type: 'url', data: url, name: url.split('/').pop() }));
+            }
+
+            for (let i = 0; i < tasks.length; i++) {
+                const task = tasks[i];
                 try {
-                    statusText.textContent = `Processing file ${i + 1} of ${selectedFiles.length}: ${file.name}...`;
-                    const { fullText, firstPageText } = await extractTextFromPdf(file);
-                    if (!fullText.trim()) {
-                         displayFileHeader(file, { companyName: 'N/A', rfpNumber: 'N/A', itemNumber: 'N/A' }, 'Could not extract text from this PDF.');
-                         continue;
-                    };
-
-                    const extractedData = await findDataWithGemini(fullText, firstPageText, file.name);
-
-                    // Add prefixes if they are missing
-                    if (extractedData.rfpNumber && extractedData.rfpNumber !== 'N/A' && !extractedData.rfpNumber.toLowerCase().startsWith('rfp')) {
-                        extractedData.rfpNumber = `RFP ${extractedData.rfpNumber}`;
+                    statusText.textContent = `Processing ${i + 1} of ${tasks.length}: ${task.name}...`;
+                    let extractedData;
+                    if (task.type === 'file') {
+                        const { fullText, firstPageText } = await extractTextFromPdf(task.data);
+                        if (!fullText.trim()) throw new Error('Could not extract text from this PDF.');
+                        extractedData = await findDataWithGemini({ text: fullText, firstPageText: firstPageText, fileName: task.name });
+                    } else { // type is 'url'
+                        extractedData = await findDataWithGemini({ url: task.data });
                     }
-                    if (extractedData.itemNumber && extractedData.itemNumber !== 'N/A' && !extractedData.itemNumber.toLowerCase().startsWith('item')) {
-                        extractedData.itemNumber = `Item ${extractedData.itemNumber}`;
-                    }
+                    
+                    if (extractedData.rfpNumber && extractedData.rfpNumber !== 'N/A' && !extractedData.rfpNumber.toLowerCase().startsWith('rfp')) extractedData.rfpNumber = `RFP ${extractedData.rfpNumber}`;
+                    if (extractedData.itemNumber && extractedData.itemNumber !== 'N/A' && !extractedData.itemNumber.toLowerCase().startsWith('item')) extractedData.itemNumber = `Item ${extractedData.itemNumber}`;
+                    
+                    displayResultsForFile(task, extractedData);
+                    if (extractedData.people && extractedData.people.length > 0) totalPeopleFound += extractedData.people.length;
 
-                    displayResultsForFile(file, extractedData);
-                    if (extractedData.people && extractedData.people.length > 0) {
-                        totalPeopleFound += extractedData.people.length;
-                    }
                 } catch (error) {
-                    console.error(`Failed to process ${file.name}:`, error);
-                    displayFileHeader(file, { companyName: 'Error', rfpNumber: 'Error', itemNumber: 'Error' }, `Failed to process this file: ${error.message}`);
+                    console.error(`Failed to process ${task.name}:`, error);
+                    displayFileHeader(task, { companyName: 'Error', rfpNumber: 'Error', itemNumber: 'Error' }, `Failed to process: ${error.message}`);
                 }
             }
 
-            statusText.textContent = `Extraction Complete. Processed ${selectedFiles.length} file(s).`;
+            statusText.textContent = `Extraction Complete. Processed ${tasks.length} source(s).`;
             spinner.classList.add('hidden');
             resultsContainer.classList.remove('hidden');
-            
-            if (totalPeopleFound > 0) {
-                exportBtn.classList.remove('hidden');
-            } else {
-                noPeopleFound.classList.remove('hidden');
-            }
-            extractBtn.disabled = false;
+            if (totalPeopleFound > 0) exportBtn.classList.remove('hidden');
+            else noPeopleFound.classList.remove('hidden');
+            validateInputs();
         });
-
-        exportBtn.addEventListener('click', () => exportTableToCsv('extracted_data.csv'));
 
         async function extractTextFromPdf(file) {
             const reader = new FileReader();
@@ -231,75 +306,61 @@
                     try {
                         const typedarray = new Uint8Array(event.target.result);
                         const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
-                        let fullText = '';
-                        let firstPageText = '';
-
+                        let fullText = '', firstPageText = '';
                         if (pdf.numPages > 0) {
                             const page1 = await pdf.getPage(1);
                             const textContent1 = await page1.getTextContent();
                             firstPageText = textContent1.items.map(item => item.str).join(' ');
                             fullText += firstPageText;
                         }
-
                         for (let i = 2; i <= pdf.numPages; i++) {
                             const page = await pdf.getPage(i);
                             const textContent = await page.getTextContent();
                             fullText += '\n' + textContent.items.map(item => item.str).join(' ');
                         }
                         resolve({ fullText, firstPageText });
-                    } catch (error) {
-                        reject(new Error('Failed to parse PDF. It might be corrupted or protected.'));
-                    }
+                    } catch (error) { reject(new Error('Failed to parse PDF.')); }
                 };
                 reader.onerror = () => reject(new Error('Failed to read the file.'));
                 reader.readAsArrayBuffer(file);
             });
         }
 
-        async function findDataWithGemini(fullText, firstPageText, fileName) {
-            // This function now calls our own backend proxy instead of Google directly.
+        async function findDataWithGemini(payload) {
             const response = await fetch('/api/fetch-data', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: fullText, firstPageText: firstPageText, fileName: fileName })
+                body: JSON.stringify(payload)
             });
-
             if (!response.ok) {
                 const err = await response.json();
                 throw new Error(`API request failed: ${err.error || response.statusText}`);
             }
-
             const result = await response.json();
-            
             if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
                 const jsonText = result.candidates[0].content.parts[0].text;
                 try {
-                    const parsedJson = JSON.parse(jsonText);
-                    return { companyName: parsedJson.companyName || "N/A", rfpNumber: parsedJson.rfpNumber || "N/A", itemNumber: parsedJson.itemNumber || "N/A", people: parsedJson.people || [] };
+                    return JSON.parse(jsonText);
                 } catch (e) {
-                    console.error("Failed to parse JSON from API response:", jsonText);
                     throw new Error("Could not understand the data format from the AI model.");
                 }
             } else {
-                console.warn("API response was empty or malformed", result);
                 return { companyName: "N/A", rfpNumber: "N/A", itemNumber: "N/A", people: [] };
             }
         }
         
-        function displayFileHeader(file, docInfo, message = '') {
+        function displayFileHeader(task, docInfo, message = '') {
             const headerRow = resultsTbody.insertRow();
             headerRow.className = 'file-header-row';
             const cell = headerRow.insertCell();
-            cell.colSpan = 8; // Updated colspan
-            let headerText = `File: ${file.name} | Company: ${docInfo.companyName} | RFP: ${docInfo.rfpNumber} | Item: ${docInfo.itemNumber}`;
-            if (message) {
-                headerText += ` | Status: ${message}`;
-            }
+            cell.colSpan = 8;
+            let headerText = `Source: ${task.name} | Company: ${docInfo.companyName} | RFP: ${docInfo.rfpNumber} | Item: ${docInfo.itemNumber}`;
+            if (message) headerText += ` | Status: ${message}`;
             cell.textContent = headerText;
         }
 
-        function displayResultsForFile(file, extractedData) {
-            displayFileHeader(file, extractedData);
+        function displayResultsForFile(task, extractedData) {
+            displayFileHeader(task, extractedData);
             if (extractedData.people && extractedData.people.length > 0) {
                 extractedData.people.forEach(person => {
                     const row = resultsTbody.insertRow();
@@ -316,7 +377,7 @@
             } else {
                  const row = resultsTbody.insertRow();
                  const cell = row.insertCell();
-                 cell.colSpan = 8; // Updated colspan
+                 cell.colSpan = 8;
                  cell.textContent = 'No people found in this document.';
                  cell.className = 'text-center text-gray-500 p-4';
             }
@@ -326,7 +387,6 @@
             const cell = row.insertCell();
             cell.textContent = text;
             cell.className = 'px-4 py-3 text-sm text-gray-700';
-            return cell;
         }
 
         function createSearchLinkCell(row, name, company) {
@@ -334,7 +394,6 @@
             cell.className = 'px-4 py-3 text-sm';
             if (!name || name === 'N/A') {
                 cell.textContent = 'N/A';
-                cell.className += ' text-gray-500';
                 return;
             }
             const query = encodeURIComponent(`site:linkedin.com/in/ "${name}" "${company || ''}"`);
@@ -363,43 +422,34 @@
                 if (data.includes(',')) data = `"${data}"`;
                 return data;
             };
-
-            const dataRows = document.querySelectorAll("#results-table tbody tr");
-            
-            // Add Table Headers first
             const headerRow = document.querySelector("#results-table thead tr");
             const headerData = [];
             headerRow.querySelectorAll("th").forEach(th => headerData.push(formatCsvField(th.innerText)));
             csv.push(headerData.join(","));
-
+            const dataRows = document.querySelectorAll("#results-table tbody tr");
             for (const row of dataRows) {
-                // If it's a file header row, parse it and add to CSV
                 if (row.classList.contains('file-header-row')) {
-                    csv.push(''); // Add a blank line for separation
+                    csv.push('');
                     const headerText = row.cells[0].textContent;
                     const parts = headerText.split('|').map(p => p.trim());
                     parts.forEach(part => {
                         const [key, ...value] = part.split(':');
                         csv.push(`${formatCsvField(key.trim())},${formatCsvField(value.join(':').trim())}`);
                     });
-                     csv.push(''); // Add another blank line
-                } else { // It's a data row
+                    csv.push('');
+                } else {
                     const cols = row.querySelectorAll("td");
                     const rowData = [];
                     cols.forEach(col => {
                         let data;
                         const link = col.querySelector('a');
-                        if (link) {
-                            data = link.href;
-                        } else {
-                            data = col.innerText;
-                        }
+                        if (link) data = link.href;
+                        else data = col.innerText;
                         rowData.push(formatCsvField(data));
                     });
                     if(rowData.length > 1) csv.push(rowData.join(","));
                 }
             }
-
             const csvFile = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
             const downloadLink = document.createElement("a");
             downloadLink.download = filename;

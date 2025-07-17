@@ -1,31 +1,38 @@
-// This is your secure, server-side function.
-// It will run on Netlify's servers, not in the user's browser.
+// This function now also needs 'axios' and 'pdf-parse' to handle URLs.
+
+const axios = require('axios');
+const pdf = require('pdf-parse');
 
 exports.handler = async (event) => {
-  // 1. Get the secret API key from Netlify's environment variables.
-  //    You will set this up in the Netlify UI.
   const apiKey = process.env.GEMINI_API_KEY;
-
-  // 2. Check if the API key is available.
   if (!apiKey) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "API key is not configured on the server." }),
-    };
-  }
-  
-  // 3. Get the text from the PDF that was sent from the frontend.
-  const { text, firstPageText, fileName } = JSON.parse(event.body);
-
-  if (!text) {
-      return {
-          statusCode: 400,
-          body: JSON.stringify({ error: "No text provided to analyze." }),
-      };
+    return { statusCode: 500, body: JSON.stringify({ error: "API key is not configured on the server." }) };
   }
 
-  // 4. Prepare the request to the Google Gemini API.
-  const prompt = `From the text provided, extract the following information and return it as a single JSON object.
+  try {
+    const { url, text, firstPageText, fileName } = JSON.parse(event.body);
+    let fullText, page1Text, nameOfFile;
+
+    if (url) {
+        // If a URL is provided, download and parse the PDF on the server
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const pdfData = await pdf(response.data);
+        fullText = pdfData.text;
+        // For simplicity, we'll extract the first part of the text for the first page context
+        page1Text = fullText.substring(0, 2000); 
+        nameOfFile = url.split('/').pop();
+    } else {
+        // Use the text provided from a direct file upload
+        fullText = text;
+        page1Text = firstPageText;
+        nameOfFile = fileName;
+    }
+
+    if (!fullText) {
+        return { statusCode: 400, body: JSON.stringify({ error: "No text content found to analyze." }) };
+    }
+
+    const prompt = `From the text provided, extract the following information and return it as a single JSON object.
 
 1.  **companyName**: Determine the primary company name. To do this, ONLY consider the provided filename and the text from the first page of the document. Do NOT look for the company name in the rest of the document text.
 2.  **rfpNumber**: The RFP Number (e.g., RFP_2502, RFP 2502, RFP-2502). Find this anywhere in the full document text.
@@ -43,84 +50,45 @@ For each person in the 'people' array, extract the following fields:
 If a top-level field (like rfpNumber) is not found, its value should be "N/A". If no people are found, the 'people' array should be empty.
 
 **Context for Company Name:**
-- Filename: "${fileName}"
-- First Page Text: "${firstPageText}"
+- Filename/URL: "${nameOfFile}"
+- First Page Text: "${page1Text}"
 
 **Full Document Text for all other fields:**
 ---
-${text}
+${fullText}
 ---
 `;
-  const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } };
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } };
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-  try {
-    // 5. Make the secure API call from the server.
-    const response = await fetch(apiUrl, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(payload) 
-    });
+    const geminiResponse = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!geminiResponse.ok) throw new Error(`Gemini API request failed with status ${geminiResponse.status}`);
+    
+    const result = await geminiResponse.json();
 
-    if (!response.ok) {
-        const errorBody = await response.text();
-        console.error("API Error:", errorBody);
-        return {
-            statusCode: response.status,
-            body: JSON.stringify({ error: `API request failed with status ${response.status}` }),
-        };
-    }
-
-    const result = await response.json();
-
-    // 6. Process the result to add the calculated role.
     if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
         const jsonText = result.candidates[0].content.parts[0].text;
-        let parsedJson;
-        try {
-            parsedJson = JSON.parse(jsonText);
-        } catch (e) {
-            console.error("Failed to parse JSON from API response:", jsonText);
-            throw new Error("Could not understand the data format from the AI model.");
-        }
+        let parsedJson = JSON.parse(jsonText);
 
         if (parsedJson.people && Array.isArray(parsedJson.people)) {
             parsedJson.people.forEach(person => {
                 const yoe = parseInt(person.yoe, 10);
-                if (isNaN(yoe)) {
-                    person.role = 'N/A';
-                } else if (yoe <= 1) {
-                    person.role = 'entry';
-                } else if (yoe <= 4) {
-                    person.role = 'junior';
-                } else if (yoe <= 8) {
-                    person.role = 'mid';
-                } else if (yoe <= 12) {
-                    person.role = 'senior';
-                } else if (yoe <= 15) {
-                    person.role = 'lead';
-                } else {
-                    person.role = 'principle';
-                }
+                if (isNaN(yoe)) person.role = 'N/A';
+                else if (yoe <= 1) person.role = 'entry';
+                else if (yoe <= 4) person.role = 'junior';
+                else if (yoe <= 8) person.role = 'mid';
+                else if (yoe <= 12) person.role = 'senior';
+                else if (yoe <= 15) person.role = 'lead';
+                else person.role = 'principle';
             });
         }
-        
-        // Replace the original result body with our processed version
         result.candidates[0].content.parts[0].text = JSON.stringify(parsedJson);
     }
 
-
-    // 7. Send the processed result back to the frontend.
-    return {
-      statusCode: 200,
-      body: JSON.stringify(result),
-    };
+    return { statusCode: 200, body: JSON.stringify(result) };
 
   } catch (error) {
     console.error("Function Error:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };
