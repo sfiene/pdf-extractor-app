@@ -1,8 +1,7 @@
-// This function now uses Puppeteer to control a headless browser.
-// It can render JavaScript-heavy pages before finding the links.
+// This function now uses the more reliable @sparticuz/chromium package.
 
-const puppeteer = require('puppeteer-core');
-const chromium = require('chrome-aws-lambda');
+const chromium = require('@sparticuz/chromium');
+const puppeteer = require('puppeteer');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -17,11 +16,11 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'URL is required' }) };
     }
 
-    // Launch the headless browser
+    // Launch the headless browser using the new package
     browser = await puppeteer.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath,
+      executablePath: await chromium.executablePath(),
       headless: chromium.headless,
       ignoreHTTPSErrors: true,
     });
@@ -31,19 +30,16 @@ exports.handler = async (event) => {
     // Go to the URL and wait for the network to be idle
     await page.goto(url, { waitUntil: 'networkidle2' });
 
-    // IMPORTANT: Wait for the specific table element to be rendered on the page.
-    // This is the key step to ensure the JavaScript has finished running.
+    // Wait for the specific table element to be rendered on the page.
     await page.waitForSelector('#gvLoisSubmittals');
 
     // Now that the table exists, extract all the PDF links from it.
     const pdfUrls = await page.evaluate(() => {
-      // This code runs inside the browser context
       const links = Array.from(document.querySelectorAll('#gvLoisSubmittals td.k-command-cell > a'));
-      const urls = new Set(); // Use a Set to avoid duplicates
+      const urls = new Set();
       
       links.forEach(link => {
         if (link.href && link.href.toLowerCase().includes('.pdf')) {
-          // The 'href' is already an absolute URL in this context
           urls.add(link.href);
         }
       });
