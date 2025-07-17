@@ -55,18 +55,6 @@
             <p class="text-gray-500 mt-2">Upload one or more PDF files to extract structured data.</p>
         </div>
 
-        <!-- API Key Input -->
-        <div class="mb-6">
-            <label for="api-key" class="block text-sm font-medium text-gray-700 mb-1">Google Gemini API Key</label>
-            <div class="flex items-center">
-                <input type="password" id="api-key" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter your API key">
-                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="ml-2 text-sm text-blue-600 hover:underline" title="Get your free API key from Google AI Studio">
-                    Get Key
-                </a>
-            </div>
-             <p class="mt-1 text-xs text-gray-500">Your key is stored in your browser's local storage and is not sent anywhere else.</p>
-        </div>
-
         <!-- File Upload Section -->
         <div class="mb-6">
             <label for="pdf-upload" id="file-input-label" class="file-input-label flex justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer">
@@ -131,7 +119,6 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
 
         // DOM Elements
-        const apiKeyInput = document.getElementById('api-key');
         const pdfUpload = document.getElementById('pdf-upload');
         const fileInputLabel = document.getElementById('file-input-label');
         const extractBtn = document.getElementById('extract-btn');
@@ -148,24 +135,6 @@
 
         let selectedFiles = [];
 
-        // --- Initialization ---
-        
-        // Load API key from local storage on page load
-        window.addEventListener('load', () => {
-            const savedKey = localStorage.getItem('geminiApiKey');
-            if (savedKey) {
-                apiKeyInput.value = savedKey;
-            }
-            validateInputs();
-        });
-
-        // Save API key to local storage when it changes
-        apiKeyInput.addEventListener('input', () => {
-            localStorage.setItem('geminiApiKey', apiKeyInput.value);
-            validateInputs();
-        });
-
-
         // --- File Handling ---
 
         function handleFiles(files) {
@@ -173,18 +142,13 @@
             
             if (selectedFiles.length > 0) {
                 fileNameSpan.textContent = `${selectedFiles.length} PDF file(s) selected`;
+                extractBtn.disabled = false;
                 errorContainer.classList.add('hidden');
             } else {
                 showError("No valid PDF files selected.");
                 fileNameSpan.innerHTML = `Drop PDF files to Attach, or <span class="text-blue-600 underline">browse</span>`;
+                extractBtn.disabled = true;
             }
-            validateInputs();
-        }
-
-        function validateInputs() {
-            const hasApiKey = apiKeyInput.value.trim().length > 0;
-            const hasFiles = selectedFiles.length > 0;
-            extractBtn.disabled = !(hasApiKey && hasFiles);
         }
 
         pdfUpload.addEventListener('change', (event) => handleFiles(event.target.files));
@@ -254,7 +218,7 @@
             } else {
                 noPeopleFound.classList.remove('hidden');
             }
-            validateInputs();
+            extractBtn.disabled = false;
         });
 
         exportBtn.addEventListener('click', () => exportTableToCsv('extracted_data.csv'));
@@ -283,45 +247,20 @@
         }
 
         async function findDataWithGemini(text) {
-            const apiKey = apiKeyInput.value.trim();
-            if (!apiKey) {
-                throw new Error("Google Gemini API Key is missing. Please provide a key to proceed.");
+            // This function now calls our own backend proxy instead of Google directly.
+            const response = await fetch('/api/fetch-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(`API request failed: ${err.error || response.statusText}`);
             }
-
-            const maxTextLength = 150000;
-            const truncatedText = text.substring(0, maxTextLength);
-            const prompt = `From the text provided, extract the following information and return it as a single JSON object.
-
-1.  **companyName**: The primary company name that is the subject of the document.
-2.  **rfpNumber**: The RFP Number (e.g., RFP_2502, RFP 2502, RFP-2502).
-3.  **itemNumber**: The Item Number (e.g., Item-18, Item 18, Item_18).
-4.  **people**: An array of objects, where each object represents a person mentioned.
-
-For each person in the 'people' array, extract the following fields:
-- **name**: The person's full name.
-- **company**: The company they work for. If it's the same as the main companyName, use that.
-- **is_pe**: A string, "Yes" if they have a "PE" designation, otherwise "No".
-- **discipline**: Their engineering or professional discipline (e.g., "Roadway", "Hydraulics", "Pavement", "Bridge", "Project Management"). If not clear, use "N/A".
-- **role**: Their seniority level, categorized as "Senior", "Mid", or "Junior" based on their title (e.g., "Principal" is Senior, "Engineer" is Mid). If not clear, use "N/A".
-- **location**: Their office location (City, State) if mentioned. If not found, use "N/A".
-
-If a top-level field (like rfpNumber) is not found, its value should be "N/A". If no people are found, the 'people' array should be empty.
-
-Text:
----
-${truncatedText}
----
-`;
-            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } };
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            
-            if (response.status === 403) {
-                throw new Error("API request failed with status 403 (Forbidden). Please check if your API key is correct and has the necessary permissions.");
-            }
-            if (!response.ok) throw new Error(`API request failed with status ${response.status}.`);
 
             const result = await response.json();
+            
             if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
                 const jsonText = result.candidates[0].content.parts[0].text;
                 try {
