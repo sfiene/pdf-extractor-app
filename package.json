@@ -1,6 +1,6 @@
 {
   "name": "pdf-extractor-v2",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "PDF data extractor with URL crawling.",
   "main": "index.html",
   "scripts": {

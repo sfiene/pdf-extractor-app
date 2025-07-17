@@ -1,11 +1,7 @@
-// This version adds compatibility flags for the @sparticuz/chromium package.
+// This version adds more robust compatibility flags for the browser.
 
 const chromium = require('@sparticuz/chromium');
 const puppeteer = require('puppeteer');
-
-// Add recommended flags for serverless environments
-chromium.setHeadlessMode = true;
-chromium.setGraphicsMode = false;
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -20,9 +16,18 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'URL is required' }) };
     }
 
+    // Add more robust arguments for a restricted serverless environment
+    const browserArgs = [
+        ...chromium.args,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--single-process'
+    ];
+
     // Launch the headless browser with the compatibility flags
     browser = await puppeteer.launch({
-      args: chromium.args,
+      args: browserArgs,
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,
