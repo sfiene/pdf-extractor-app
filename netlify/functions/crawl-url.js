@@ -1,7 +1,11 @@
-// This version adds more robust compatibility flags for the browser.
+// This version uses a more accurate CSS selector to find the download links.
 
 const chromium = require('@sparticuz/chromium');
 const puppeteer = require('puppeteer');
+
+// Add recommended flags for serverless environments
+chromium.setHeadlessMode = true;
+chromium.setGraphicsMode = false;
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -36,18 +40,22 @@ exports.handler = async (event) => {
 
     const page = await browser.newPage();
     
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
+    await page.setUserAgent('Mozilla/5.G (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
 
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
     await page.waitForSelector('#gvLoisSubmittals', { timeout: 60000 });
 
+    // Now that the table exists, extract all the PDF links from it using the new, more accurate selector.
     const pdfUrls = await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll('#gvLoisSubmittals td.k-command-cell > a'));
+      // This code runs inside the browser context
+      // This selector finds the 'a' tag inside the first 'td' of each row in the table body.
+      const links = Array.from(document.querySelectorAll('#gvLoisSubmittals table tbody tr td:first-child a'));
       const urls = new Set();
       
       links.forEach(link => {
-        if (link.href && link.href.toLowerCase().includes('.pdf')) {
+        // The 'href' attribute should be a complete URL.
+        if (link.href) {
           urls.add(link.href);
         }
       });
