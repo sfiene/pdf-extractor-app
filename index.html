@@ -98,6 +98,7 @@
                                 <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Company</th>
                                 <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">PE?</th>
                                 <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Discipline</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">YOE</th>
                                 <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Role</th>
                                 <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Location</th>
                             </tr>
@@ -289,7 +290,7 @@
             const headerRow = resultsTbody.insertRow();
             headerRow.className = 'file-header-row';
             const cell = headerRow.insertCell();
-            cell.colSpan = 7;
+            cell.colSpan = 8; // Updated colspan
             let headerText = `File: ${file.name} | Company: ${docInfo.companyName} | RFP: ${docInfo.rfpNumber} | Item: ${docInfo.itemNumber}`;
             if (message) {
                 headerText += ` | Status: ${message}`;
@@ -308,13 +309,14 @@
                     createCell(row, person.company || 'N/A');
                     createCell(row, person.is_pe || 'No');
                     createCell(row, person.discipline || 'N/A');
+                    createCell(row, person.yoe || '0');
                     createCell(row, person.role || 'N/A');
                     createCell(row, person.location || 'N/A');
                 });
             } else {
                  const row = resultsTbody.insertRow();
                  const cell = row.insertCell();
-                 cell.colSpan = 7;
+                 cell.colSpan = 8; // Updated colspan
                  cell.textContent = 'No people found in this document.';
                  cell.className = 'text-center text-gray-500 p-4';
             }
