@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Data Extractor with Excel Export</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .file-input-label {
+            transition: all 0.2s ease-in-out;
+        }
+        .file-input-label.dragover {
+            border-color: #3b82f6; /* blue-500 */
+            background-color: #eff6ff; /* blue-50 */
+        }
+        #pdf-upload:focus + label {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+        }
+        .spinner {
+            border-top-color: #3498db;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        /* Ensure table layout is consistent */
+        table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        th, td {
+            word-wrap: break-word;
+        }
+        .file-header-row td {
+            background-color: #e5e7eb; /* gray-200 */
+            font-weight: bold;
+            padding: 0.75rem 1rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6 md:p-8">
+        <div class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Advanced PDF Data Extractor</h1>
+            <p class="text-gray-500 mt-2">Upload one or more PDF files to extract structured data.</p>
+        </div>
+
+        <!-- API Key Input -->
+        <div class="mb-6">
+            <label for="api-key" class="block text-sm font-medium text-gray-700 mb-1">Google Gemini API Key</label>
+            <div class="flex items-center">
+                <input type="password" id="api-key" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter your API key">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="ml-2 text-sm text-blue-600 hover:underline" title="Get your free API key from Google AI Studio">
+                    Get Key
+                </a>
+            </div>
+             <p class="mt-1 text-xs text-gray-500">Your key is stored in your browser's local storage and is not sent anywhere else.</p>
+        </div>
+
+        <!-- File Upload Section -->
+        <div class="mb-6">
+            <label for="pdf-upload" id="file-input-label" class="file-input-label flex justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer">
+                <span class="flex items-center space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <span id="file-name" class="font-medium text-gray-600">
+                        Drop PDF files to Attach, or <span class="text-blue-600 underline">browse</span>
+                    </span>
+                </span>
+                <input type="file" id="pdf-upload" class="hidden" accept=".pdf" multiple>
+            </label>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6">
+            <button id="extract-btn" class="w-full sm:w-auto bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-300" disabled>
+                Extract Data
+            </button>
+            <button id="export-btn" class="w-full sm:w-auto bg-green-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 transition-all duration-300 hidden">
+                Export to Excel (CSV)
+            </button>
+        </div>
+
+        <!-- Status and Results Section -->
+        <div id="status-container" class="text-center space-y-4 hidden">
+            <div class="flex items-center justify-center space-x-2">
+                <div id="spinner" class="spinner w-6 h-6 rounded-full border-4 border-gray-200 hidden"></div>
+                <p id="status-text" class="text-lg font-medium text-gray-700"></p>
+            </div>
+            
+            <div id="results-container" class="mt-6 hidden text-left">
+                <!-- People Table -->
+                <div class="overflow-x-auto">
+                    <table id="results-table" class="min-w-full bg-white rounded-lg shadow">
+                        <thead class="bg-gray-200">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Name</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">LinkedIn Profile</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Company</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">PE?</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Discipline</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Role</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Location</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-tbody" class="divide-y divide-gray-200">
+                            <!-- Data rows will be injected here -->
+                        </tbody>
+                    </table>
+                </div>
+                 <p id="no-people-found" class="text-gray-500 p-4 text-center hidden">No people were found in any of the documents.</p>
+            </div>
+             <div id="error-container" class="mt-4 hidden p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                <p id="error-message"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+
+        // DOM Elements
+        const apiKeyInput = document.getElementById('api-key');
+        const pdfUpload = document.getElementById('pdf-upload');
+        const fileInputLabel = document.getElementById('file-input-label');
+        const extractBtn = document.getElementById('extract-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const fileNameSpan = document.getElementById('file-name');
+        const statusContainer = document.getElementById('status-container');
+        const statusText = document.getElementById('status-text');
+        const spinner = document.getElementById('spinner');
+        const resultsContainer = document.getElementById('results-container');
+        const resultsTbody = document.getElementById('results-tbody');
+        const errorContainer = document.getElementById('error-container');
+        const errorMessage = document.getElementById('error-message');
+        const noPeopleFound = document.getElementById('no-people-found');
+
+        let selectedFiles = [];
+
+        // --- Initialization ---
+        
+        // Load API key from local storage on page load
+        window.addEventListener('load', () => {
+            const savedKey = localStorage.getItem('geminiApiKey');
+            if (savedKey) {
+                apiKeyInput.value = savedKey;
+            }
+            validateInputs();
+        });
+
+        // Save API key to local storage when it changes
+        apiKeyInput.addEventListener('input', () => {
+            localStorage.setItem('geminiApiKey', apiKeyInput.value);
+            validateInputs();
+        });
+
+
+        // --- File Handling ---
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files).filter(file => file.type === 'application/pdf');
+            
+            if (selectedFiles.length > 0) {
+                fileNameSpan.textContent = `${selectedFiles.length} PDF file(s) selected`;
+                errorContainer.classList.add('hidden');
+            } else {
+                showError("No valid PDF files selected.");
+                fileNameSpan.innerHTML = `Drop PDF files to Attach, or <span class="text-blue-600 underline">browse</span>`;
+            }
+            validateInputs();
+        }
+
+        function validateInputs() {
+            const hasApiKey = apiKeyInput.value.trim().length > 0;
+            const hasFiles = selectedFiles.length > 0;
+            extractBtn.disabled = !(hasApiKey && hasFiles);
+        }
+
+        pdfUpload.addEventListener('change', (event) => handleFiles(event.target.files));
+        fileInputLabel.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            fileInputLabel.classList.add('dragover');
+        });
+        fileInputLabel.addEventListener('dragleave', () => fileInputLabel.classList.remove('dragover'));
+        fileInputLabel.addEventListener('drop', (event) => {
+            event.preventDefault();
+            fileInputLabel.classList.remove('dragover');
+            handleFiles(event.dataTransfer.files);
+        });
+
+        // --- Main Logic ---
+
+        extractBtn.addEventListener('click', async () => {
+            if (selectedFiles.length === 0) return;
+            
+            // Reset UI
+            extractBtn.disabled = true;
+            exportBtn.classList.add('hidden');
+            statusContainer.classList.remove('hidden');
+            spinner.classList.remove('hidden');
+            resultsContainer.classList.add('hidden');
+            errorContainer.classList.add('hidden');
+            resultsTbody.innerHTML = '';
+            noPeopleFound.classList.add('hidden');
+            let totalPeopleFound = 0;
+
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+                try {
+                    statusText.textContent = `Processing file ${i + 1} of ${selectedFiles.length}: ${file.name}...`;
+                    const pdfText = await extractTextFromPdf(file);
+                    if (!pdfText.trim()) {
+                         displayFileHeader(file, { companyName: 'N/A', rfpNumber: 'N/A', itemNumber: 'N/A' }, 'Could not extract text from this PDF.');
+                         continue;
+                    };
+
+                    const extractedData = await findDataWithGemini(pdfText);
+
+                    // Add prefixes if they are missing
+                    if (extractedData.rfpNumber && extractedData.rfpNumber !== 'N/A' && !extractedData.rfpNumber.toLowerCase().startsWith('rfp')) {
+                        extractedData.rfpNumber = `RFP ${extractedData.rfpNumber}`;
+                    }
+                    if (extractedData.itemNumber && extractedData.itemNumber !== 'N/A' && !extractedData.itemNumber.toLowerCase().startsWith('item')) {
+                        extractedData.itemNumber = `Item ${extractedData.itemNumber}`;
+                    }
+
+                    displayResultsForFile(file, extractedData);
+                    if (extractedData.people && extractedData.people.length > 0) {
+                        totalPeopleFound += extractedData.people.length;
+                    }
+                } catch (error) {
+                    console.error(`Failed to process ${file.name}:`, error);
+                    displayFileHeader(file, { companyName: 'Error', rfpNumber: 'Error', itemNumber: 'Error' }, `Failed to process this file: ${error.message}`);
+                }
+            }
+
+            statusText.textContent = `Extraction Complete. Processed ${selectedFiles.length} file(s).`;
+            spinner.classList.add('hidden');
+            resultsContainer.classList.remove('hidden');
+            
+            if (totalPeopleFound > 0) {
+                exportBtn.classList.remove('hidden');
+            } else {
+                noPeopleFound.classList.remove('hidden');
+            }
+            validateInputs();
+        });
+
+        exportBtn.addEventListener('click', () => exportTableToCsv('extracted_data.csv'));
+
+        async function extractTextFromPdf(file) {
+            const reader = new FileReader();
+            return new Promise((resolve, reject) => {
+                reader.onload = async (event) => {
+                    try {
+                        const typedarray = new Uint8Array(event.target.result);
+                        const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+                        let fullText = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            fullText += textContent.items.map(item => item.str).join(' ') + '\n';
+                        }
+                        resolve(fullText);
+                    } catch (error) {
+                        reject(new Error('Failed to parse PDF. It might be corrupted or protected.'));
+                    }
+                };
+                reader.onerror = () => reject(new Error('Failed to read the file.'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        async function findDataWithGemini(text) {
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) {
+                throw new Error("Google Gemini API Key is missing. Please provide a key to proceed.");
+            }
+
+            const maxTextLength = 150000;
+            const truncatedText = text.substring(0, maxTextLength);
+            const prompt = `From the text provided, extract the following information and return it as a single JSON object.
+
+1.  **companyName**: The primary company name that is the subject of the document.
+2.  **rfpNumber**: The RFP Number (e.g., RFP_2502, RFP 2502, RFP-2502).
+3.  **itemNumber**: The Item Number (e.g., Item-18, Item 18, Item_18).
+4.  **people**: An array of objects, where each object represents a person mentioned.
+
+For each person in the 'people' array, extract the following fields:
+- **name**: The person's full name.
+- **company**: The company they work for. If it's the same as the main companyName, use that.
+- **is_pe**: A string, "Yes" if they have a "PE" designation, otherwise "No".
+- **discipline**: Their engineering or professional discipline (e.g., "Roadway", "Hydraulics", "Pavement", "Bridge", "Project Management"). If not clear, use "N/A".
+- **role**: Their seniority level, categorized as "Senior", "Mid", or "Junior" based on their title (e.g., "Principal" is Senior, "Engineer" is Mid). If not clear, use "N/A".
+- **location**: Their office location (City, State) if mentioned. If not found, use "N/A".
+
+If a top-level field (like rfpNumber) is not found, its value should be "N/A". If no people are found, the 'people' array should be empty.
+
+Text:
+---
+${truncatedText}
+---
+`;
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } };
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            
+            if (response.status === 403) {
+                throw new Error("API request failed with status 403 (Forbidden). Please check if your API key is correct and has the necessary permissions.");
+            }
+            if (!response.ok) throw new Error(`API request failed with status ${response.status}.`);
+
+            const result = await response.json();
+            if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
+                const jsonText = result.candidates[0].content.parts[0].text;
+                try {
+                    const parsedJson = JSON.parse(jsonText);
+                    return { companyName: parsedJson.companyName || "N/A", rfpNumber: parsedJson.rfpNumber || "N/A", itemNumber: parsedJson.itemNumber || "N/A", people: parsedJson.people || [] };
+                } catch (e) {
+                    console.error("Failed to parse JSON from API response:", jsonText);
+                    throw new Error("Could not understand the data format from the AI model.");
+                }
+            } else {
+                console.warn("API response was empty or malformed", result);
+                return { companyName: "N/A", rfpNumber: "N/A", itemNumber: "N/A", people: [] };
+            }
+        }
+        
+        function displayFileHeader(file, docInfo, message = '') {
+            const headerRow = resultsTbody.insertRow();
+            headerRow.className = 'file-header-row';
+            const cell = headerRow.insertCell();
+            cell.colSpan = 7;
+            let headerText = `File: ${file.name} | Company: ${docInfo.companyName} | RFP: ${docInfo.rfpNumber} | Item: ${docInfo.itemNumber}`;
+            if (message) {
+                headerText += ` | Status: ${message}`;
+            }
+            cell.textContent = headerText;
+        }
+
+        function displayResultsForFile(file, extractedData) {
+            displayFileHeader(file, extractedData);
+            if (extractedData.people && extractedData.people.length > 0) {
+                extractedData.people.forEach(person => {
+                    const row = resultsTbody.insertRow();
+                    row.className = "hover:bg-gray-50";
+                    createCell(row, person.name || 'N/A');
+                    createSearchLinkCell(row, person.name, person.company);
+                    createCell(row, person.company || 'N/A');
+                    createCell(row, person.is_pe || 'No');
+                    createCell(row, person.discipline || 'N/A');
+                    createCell(row, person.role || 'N/A');
+                    createCell(row, person.location || 'N/A');
+                });
+            } else {
+                 const row = resultsTbody.insertRow();
+                 const cell = row.insertCell();
+                 cell.colSpan = 7;
+                 cell.textContent = 'No people found in this document.';
+                 cell.className = 'text-center text-gray-500 p-4';
+            }
+        }
+
+        function createCell(row, text) {
+            const cell = row.insertCell();
+            cell.textContent = text;
+            cell.className = 'px-4 py-3 text-sm text-gray-700';
+            return cell;
+        }
+
+        function createSearchLinkCell(row, name, company) {
+            const cell = row.insertCell();
+            cell.className = 'px-4 py-3 text-sm';
+            if (!name || name === 'N/A') {
+                cell.textContent = 'N/A';
+                cell.className += ' text-gray-500';
+                return;
+            }
+            const query = encodeURIComponent(`site:linkedin.com/in/ "${name}" "${company || ''}"`);
+            const searchUrl = `https://www.google.com/search?q=${query}`;
+            const link = document.createElement('a');
+            link.href = searchUrl;
+            link.textContent = 'Search Google';
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.className = 'text-blue-600 hover:underline';
+            cell.appendChild(link);
+        }
+        
+        function showError(message) {
+            statusText.textContent = 'Error';
+            spinner.classList.add('hidden');
+            errorMessage.textContent = message;
+            errorContainer.classList.remove('hidden');
+        }
+
+        function exportTableToCsv(filename) {
+            let csv = [];
+            const formatCsvField = (field) => {
+                let data = field ? field.toString() : '';
+                data = data.replace(/"/g, '""');
+                if (data.includes(',')) data = `"${data}"`;
+                return data;
+            };
+
+            const dataRows = document.querySelectorAll("#results-table tbody tr");
+            
+            // Add Table Headers first
+            const headerRow = document.querySelector("#results-table thead tr");
+            const headerData = [];
+            headerRow.querySelectorAll("th").forEach(th => headerData.push(formatCsvField(th.innerText)));
+            csv.push(headerData.join(","));
+
+            for (const row of dataRows) {
+                // If it's a file header row, parse it and add to CSV
+                if (row.classList.contains('file-header-row')) {
+                    csv.push(''); // Add a blank line for separation
+                    const headerText = row.cells[0].textContent;
+                    const parts = headerText.split('|').map(p => p.trim());
+                    parts.forEach(part => {
+                        const [key, ...value] = part.split(':');
+                        csv.push(`${formatCsvField(key.trim())},${formatCsvField(value.join(':').trim())}`);
+                    });
+                     csv.push(''); // Add another blank line
+                } else { // It's a data row
+                    const cols = row.querySelectorAll("td");
+                    const rowData = [];
+                    cols.forEach(col => {
+                        let data;
+                        const link = col.querySelector('a');
+                        if (link) {
+                            data = link.href;
+                        } else {
+                            data = col.innerText;
+                        }
+                        rowData.push(formatCsvField(data));
+                    });
+                    if(rowData.length > 1) csv.push(rowData.join(","));
+                }
+            }
+
+            const csvFile = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+            const downloadLink = document.createElement("a");
+            downloadLink.download = filename;
+            downloadLink.href = window.URL.createObjectURL(csvFile);
+            downloadLink.style.display = "none";
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }
+    </script>
+</body>
+</html>
