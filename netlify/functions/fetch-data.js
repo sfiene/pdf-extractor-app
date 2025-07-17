@@ -15,7 +15,7 @@ exports.handler = async (event) => {
   }
   
   // 3. Get the text from the PDF that was sent from the frontend.
-  const { text } = JSON.parse(event.body);
+  const { text, firstPageText, fileName } = JSON.parse(event.body);
 
   if (!text) {
       return {
@@ -25,18 +25,16 @@ exports.handler = async (event) => {
   }
 
   // 4. Prepare the request to the Google Gemini API.
-  const maxTextLength = 150000;
-  const truncatedText = text.substring(0, maxTextLength);
   const prompt = `From the text provided, extract the following information and return it as a single JSON object.
 
-1.  **companyName**: The primary company name that is the subject of the document.
-2.  **rfpNumber**: The RFP Number (e.g., RFP_2502, RFP 2502, RFP-2502).
-3.  **itemNumber**: The Item Number (e.g., Item-18, Item 18, Item_18).
-4.  **people**: An array of objects, where each object represents a person mentioned.
+1.  **companyName**: Determine the primary company name. To do this, ONLY consider the provided filename and the text from the first page of the document. Do NOT look for the company name in the rest of the document text.
+2.  **rfpNumber**: The RFP Number (e.g., RFP_2502, RFP 2502, RFP-2502). Find this anywhere in the full document text.
+3.  **itemNumber**: The Item Number (e.g., Item-18, Item 18, Item_18). Find this anywhere in the full document text.
+4.  **people**: An array of objects, where each object represents a person mentioned anywhere in the full document text.
 
 For each person in the 'people' array, extract the following fields:
 - **name**: The person's full name.
-- **company**: The company they work for. If it's the same as the main companyName, use that.
+- **company**: The company they work for. If it's the same as the main companyName you identified, use that.
 - **is_pe**: A string, "Yes" if they have a "PE" designation, otherwise "No".
 - **discipline**: Their engineering or professional discipline (e.g., "Roadway", "Hydraulics", "Pavement", "Bridge", "Project Management"). If not clear, use "N/A".
 - **role**: Their seniority level, categorized as "Senior", "Mid", or "Junior" based on their title (e.g., "Principal" is Senior, "Engineer" is Mid). If not clear, use "N/A".
@@ -44,9 +42,13 @@ For each person in the 'people' array, extract the following fields:
 
 If a top-level field (like rfpNumber) is not found, its value should be "N/A". If no people are found, the 'people' array should be empty.
 
-Text:
+**Context for Company Name:**
+- Filename: "${fileName}"
+- First Page Text: "${firstPageText}"
+
+**Full Document Text for all other fields:**
 ---
-${truncatedText}
+${text}
 ---
 `;
   const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } };
@@ -61,6 +63,8 @@ ${truncatedText}
     });
 
     if (!response.ok) {
+        const errorBody = await response.text();
+        console.error("API Error:", errorBody);
         return {
             statusCode: response.status,
             body: JSON.stringify({ error: `API request failed with status ${response.status}` }),
@@ -76,6 +80,7 @@ ${truncatedText}
     };
 
   } catch (error) {
+    console.error("Function Error:", error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message }),

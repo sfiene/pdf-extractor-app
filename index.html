@@ -183,13 +183,13 @@
                 const file = selectedFiles[i];
                 try {
                     statusText.textContent = `Processing file ${i + 1} of ${selectedFiles.length}: ${file.name}...`;
-                    const pdfText = await extractTextFromPdf(file);
-                    if (!pdfText.trim()) {
+                    const { fullText, firstPageText } = await extractTextFromPdf(file);
+                    if (!fullText.trim()) {
                          displayFileHeader(file, { companyName: 'N/A', rfpNumber: 'N/A', itemNumber: 'N/A' }, 'Could not extract text from this PDF.');
                          continue;
                     };
 
-                    const extractedData = await findDataWithGemini(pdfText);
+                    const extractedData = await findDataWithGemini(fullText, firstPageText, file.name);
 
                     // Add prefixes if they are missing
                     if (extractedData.rfpNumber && extractedData.rfpNumber !== 'N/A' && !extractedData.rfpNumber.toLowerCase().startsWith('rfp')) {
@@ -231,12 +231,21 @@
                         const typedarray = new Uint8Array(event.target.result);
                         const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
                         let fullText = '';
-                        for (let i = 1; i <= pdf.numPages; i++) {
+                        let firstPageText = '';
+
+                        if (pdf.numPages > 0) {
+                            const page1 = await pdf.getPage(1);
+                            const textContent1 = await page1.getTextContent();
+                            firstPageText = textContent1.items.map(item => item.str).join(' ');
+                            fullText += firstPageText;
+                        }
+
+                        for (let i = 2; i <= pdf.numPages; i++) {
                             const page = await pdf.getPage(i);
                             const textContent = await page.getTextContent();
-                            fullText += textContent.items.map(item => item.str).join(' ') + '\n';
+                            fullText += '\n' + textContent.items.map(item => item.str).join(' ');
                         }
-                        resolve(fullText);
+                        resolve({ fullText, firstPageText });
                     } catch (error) {
                         reject(new Error('Failed to parse PDF. It might be corrupted or protected.'));
                     }
@@ -246,12 +255,12 @@
             });
         }
 
-        async function findDataWithGemini(text) {
+        async function findDataWithGemini(fullText, firstPageText, fileName) {
             // This function now calls our own backend proxy instead of Google directly.
             const response = await fetch('/api/fetch-data', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: text })
+                body: JSON.stringify({ text: fullText, firstPageText: firstPageText, fileName: fileName })
             });
 
             if (!response.ok) {
