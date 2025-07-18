@@ -1,7 +1,5 @@
-// This function now also needs 'axios' and 'pdf-parse' to handle URLs.
-
-const axios = require('axios');
-const pdf = require('pdf-parse');
+// This is the simplified server-side function.
+// It only processes text from uploaded files.
 
 exports.handler = async (event) => {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -10,25 +8,9 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { url, text, firstPageText, fileName } = JSON.parse(event.body);
-    let fullText, page1Text, nameOfFile;
+    const { text, firstPageText, fileName } = JSON.parse(event.body);
 
-    if (url) {
-        // If a URL is provided, download and parse the PDF on the server
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
-        const pdfData = await pdf(response.data);
-        fullText = pdfData.text;
-        // For simplicity, we'll extract the first part of the text for the first page context
-        page1Text = fullText.substring(0, 2000); 
-        nameOfFile = url.split('/').pop();
-    } else {
-        // Use the text provided from a direct file upload
-        fullText = text;
-        page1Text = firstPageText;
-        nameOfFile = fileName;
-    }
-
-    if (!fullText) {
+    if (!text) {
         return { statusCode: 400, body: JSON.stringify({ error: "No text content found to analyze." }) };
     }
 
@@ -50,12 +32,12 @@ For each person in the 'people' array, extract the following fields:
 If a top-level field (like rfpNumber) is not found, its value should be "N/A". If no people are found, the 'people' array should be empty.
 
 **Context for Company Name:**
-- Filename/URL: "${nameOfFile}"
-- First Page Text: "${page1Text}"
+- Filename: "${fileName}"
+- First Page Text: "${firstPageText}"
 
 **Full Document Text for all other fields:**
 ---
-${fullText}
+${text}
 ---
 `;
     const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } };

@@ -1,17 +1,5 @@
 {
-  "name": "pdf-extractor-v2",
-  "version": "2.2.0",
-  "description": "PDF data extractor with URL crawling.",
-  "main": "index.html",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@sparticuz/chromium": "^123.0.1",
-    "axios": "^1.7.2",
-    "pdf-parse": "^1.1.1",
-    "puppeteer": "^22.10.0"
-  }
+  "name": "pdf-extractor-v3",
+  "version": "3.0.0",
+  "description": "PDF data extractor with folder drop support."
 }

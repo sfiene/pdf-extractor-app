@@ -1,7 +1,4 @@
-# This version increases the resources available to the crawl function.
-
 [build]
-  command = "npm install"
   functions = "netlify/functions"
   publish = "."
 
@@ -9,8 +6,3 @@
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
-
-# Increase memory and timeout for the resource-heavy crawl function
-[functions."crawl-url"]
-  memory = 1024 # MB
-  timeout = 30 # seconds

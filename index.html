@@ -47,38 +47,20 @@
     <div class="w-full max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6 md:p-8">
         <div class="text-center mb-6">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Advanced PDF Data Extractor</h1>
-            <p class="text-gray-500 mt-2">Upload PDFs directly or enter a URL to find and process PDF files.</p>
-        </div>
-
-        <!-- Input Tabs -->
-        <div class="mb-4 border-b border-gray-200">
-            <nav class="flex space-x-4" aria-label="Tabs">
-                <button id="tab-upload" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md border-b-2 border-blue-500">File Upload</button>
-                <button id="tab-url" class="text-gray-500 hover:text-gray-700 px-3 py-2 font-medium text-sm rounded-md border-b-2 border-transparent">Crawl URL</button>
-            </nav>
+            <p class="text-gray-500 mt-2">Drop a folder or select files to find and process all PDFs within.</p>
         </div>
 
         <!-- File Upload Section -->
-        <div id="upload-section" class="mb-6">
+        <div class="mb-6">
             <label for="pdf-upload" id="file-input-label" class="file-input-label flex justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer">
                 <span class="flex items-center space-x-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                    <span id="file-name" class="font-medium text-gray-600">Drop PDF files to Attach, or <span class="text-blue-600 underline">browse</span></span>
+                    <span id="file-name" class="font-medium text-gray-600">
+                        Drop a Folder or PDF files to Attach, or <span class="text-blue-600 underline">browse</span>
+                    </span>
                 </span>
-                <input type="file" id="pdf-upload" class="hidden" accept=".pdf" multiple>
+                <input type="file" id="pdf-upload" class="hidden" accept=".pdf" multiple webkitdirectory>
             </label>
-        </div>
-
-        <!-- URL Crawl Section -->
-        <div id="url-section" class="mb-6 hidden">
-            <div class="flex items-center space-x-2">
-                <input type="url" id="url-input" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="https://example.com/reports">
-                <button id="crawl-btn" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300">Crawl</button>
-            </div>
-            <div id="crawled-files-container" class="mt-4 hidden">
-                <h3 class="text-lg font-medium mb-2">PDFs Found:</h3>
-                <div id="crawled-files-list" class="max-h-40 overflow-y-auto space-y-2 p-3 bg-gray-50 rounded-md border"></div>
-            </div>
         </div>
 
         <!-- Action Buttons -->
@@ -127,17 +109,9 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
 
         // DOM Elements
-        const tabUpload = document.getElementById('tab-upload');
-        const tabUrl = document.getElementById('tab-url');
-        const uploadSection = document.getElementById('upload-section');
-        const urlSection = document.getElementById('url-section');
         const pdfUpload = document.getElementById('pdf-upload');
         const fileInputLabel = document.getElementById('file-input-label');
         const fileNameSpan = document.getElementById('file-name');
-        const urlInput = document.getElementById('url-input');
-        const crawlBtn = document.getElementById('crawl-btn');
-        const crawledFilesContainer = document.getElementById('crawled-files-container');
-        const crawledFilesList = document.getElementById('crawled-files-list');
         const extractBtn = document.getElementById('extract-btn');
         const exportBtn = document.getElementById('export-btn');
         const statusContainer = document.getElementById('status-container');
@@ -150,102 +124,29 @@
         const noPeopleFound = document.getElementById('no-people-found');
 
         let selectedFiles = [];
-        let crawledPdfUrls = [];
-        let currentMode = 'upload'; // 'upload' or 'url'
 
-        // --- Tab Switching Logic ---
-        function switchTab(mode) {
-            currentMode = mode;
-            if (mode === 'upload') {
-                tabUpload.classList.add('border-blue-500', 'text-gray-800');
-                tabUpload.classList.remove('border-transparent', 'text-gray-500');
-                tabUrl.classList.add('border-transparent', 'text-gray-500');
-                tabUrl.classList.remove('border-blue-500', 'text-gray-800');
-                uploadSection.classList.remove('hidden');
-                urlSection.classList.add('hidden');
-            } else {
-                tabUrl.classList.add('border-blue-500', 'text-gray-800');
-                tabUrl.classList.remove('border-transparent', 'text-gray-500');
-                tabUpload.classList.add('border-transparent', 'text-gray-500');
-                tabUpload.classList.remove('border-blue-500', 'text-gray-800');
-                urlSection.classList.remove('hidden');
-                uploadSection.classList.add('hidden');
-            }
-            validateInputs();
-        }
-        tabUpload.addEventListener('click', () => switchTab('upload'));
-        tabUrl.addEventListener('click', () => switchTab('url'));
-
-        // --- File & URL Handling ---
-        function validateInputs() {
-            const hasUploads = selectedFiles.length > 0;
-            const hasCrawledUrls = crawledPdfUrls.length > 0;
-            extractBtn.disabled = !(hasUploads || hasCrawledUrls);
-        }
-
+        // --- File Handling ---
         function handleFiles(files) {
             selectedFiles = Array.from(files).filter(file => file.type === 'application/pdf');
             if (selectedFiles.length > 0) {
-                fileNameSpan.textContent = `${selectedFiles.length} PDF file(s) selected`;
+                fileNameSpan.textContent = `${selectedFiles.length} PDF file(s) found and selected`;
+                extractBtn.disabled = false;
                 errorContainer.classList.add('hidden');
             } else {
-                showError("No valid PDF files selected.");
-                fileNameSpan.innerHTML = `Drop PDF files to Attach, or <span class="text-blue-600 underline">browse</span>`;
+                showError("No PDF files found in the selection or folder.");
+                fileNameSpan.innerHTML = `Drop a Folder or PDF files to Attach, or <span class="text-blue-600 underline">browse</span>`;
+                extractBtn.disabled = true;
             }
-            validateInputs();
         }
 
         pdfUpload.addEventListener('change', (event) => handleFiles(event.target.files));
         fileInputLabel.addEventListener('dragover', (event) => { event.preventDefault(); fileInputLabel.classList.add('dragover'); });
         fileInputLabel.addEventListener('dragleave', () => fileInputLabel.classList.remove('dragover'));
-        fileInputLabel.addEventListener('drop', (event) => { event.preventDefault(); fileInputLabel.classList.remove('dragover'); handleFiles(event.dataTransfer.files); });
-
-        // --- Crawling Logic ---
-        crawlBtn.addEventListener('click', async () => {
-            const url = urlInput.value.trim();
-            if (!url) {
-                showError("Please enter a valid URL.");
-                return;
-            }
-            
-            crawlBtn.disabled = true;
-            statusText.textContent = `Crawling ${url} for PDF links...`;
-            statusContainer.classList.remove('hidden');
-            spinner.classList.remove('hidden');
-            errorContainer.classList.add('hidden');
-            crawledFilesContainer.classList.add('hidden');
-            crawledFilesList.innerHTML = '';
-
-            try {
-                const response = await fetch('/api/crawl-url', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: url })
-                });
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.error || `Failed to crawl URL with status ${response.status}`);
-                }
-                const { pdfUrls } = await response.json();
-                crawledPdfUrls = pdfUrls;
-                
-                if (crawledPdfUrls.length > 0) {
-                    crawledFilesList.innerHTML = crawledPdfUrls.map(pdfUrl => `<div class="p-2 bg-white rounded border">${pdfUrl.split('/').pop()}</div>`).join('');
-                    crawledFilesContainer.classList.remove('hidden');
-                } else {
-                    crawledFilesList.innerHTML = `<div class="p-2 text-gray-500">No PDF links found on that page.</div>`;
-                    crawledFilesContainer.classList.remove('hidden');
-                }
-                validateInputs();
-            } catch (error) {
-                showError(error.message);
-            } finally {
-                spinner.classList.add('hidden');
-                statusText.textContent = '';
-                crawlBtn.disabled = false;
-            }
+        fileInputLabel.addEventListener('drop', (event) => {
+            event.preventDefault();
+            fileInputLabel.classList.remove('dragover');
+            handleFiles(event.dataTransfer.files);
         });
-
 
         // --- Main Extraction Logic ---
         extractBtn.addEventListener('click', async () => {
@@ -259,44 +160,33 @@
             noPeopleFound.classList.add('hidden');
             let totalPeopleFound = 0;
 
-            const tasks = [];
-            if (currentMode === 'upload') {
-                selectedFiles.forEach(file => tasks.push({ type: 'file', data: file, name: file.name }));
-            } else {
-                crawledPdfUrls.forEach(url => tasks.push({ type: 'url', data: url, name: url.split('/').pop() }));
-            }
-
-            for (let i = 0; i < tasks.length; i++) {
-                const task = tasks[i];
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
                 try {
-                    statusText.textContent = `Processing ${i + 1} of ${tasks.length}: ${task.name}...`;
-                    let extractedData;
-                    if (task.type === 'file') {
-                        const { fullText, firstPageText } = await extractTextFromPdf(task.data);
-                        if (!fullText.trim()) throw new Error('Could not extract text from this PDF.');
-                        extractedData = await findDataWithGemini({ text: fullText, firstPageText: firstPageText, fileName: task.name });
-                    } else { // type is 'url'
-                        extractedData = await findDataWithGemini({ url: task.data });
-                    }
+                    statusText.textContent = `Processing ${i + 1} of ${selectedFiles.length}: ${file.name}...`;
+                    const { fullText, firstPageText } = await extractTextFromPdf(file);
+                    if (!fullText.trim()) throw new Error('Could not extract text from this PDF.');
+                    
+                    const extractedData = await findDataWithGemini(fullText, firstPageText, file.name);
                     
                     if (extractedData.rfpNumber && extractedData.rfpNumber !== 'N/A' && !extractedData.rfpNumber.toLowerCase().startsWith('rfp')) extractedData.rfpNumber = `RFP ${extractedData.rfpNumber}`;
                     if (extractedData.itemNumber && extractedData.itemNumber !== 'N/A' && !extractedData.itemNumber.toLowerCase().startsWith('item')) extractedData.itemNumber = `Item ${extractedData.itemNumber}`;
                     
-                    displayResultsForFile(task, extractedData);
+                    displayResultsForFile(file, extractedData);
                     if (extractedData.people && extractedData.people.length > 0) totalPeopleFound += extractedData.people.length;
 
                 } catch (error) {
-                    console.error(`Failed to process ${task.name}:`, error);
-                    displayFileHeader(task, { companyName: 'Error', rfpNumber: 'Error', itemNumber: 'Error' }, `Failed to process: ${error.message}`);
+                    console.error(`Failed to process ${file.name}:`, error);
+                    displayFileHeader(file, { companyName: 'Error', rfpNumber: 'Error', itemNumber: 'Error' }, `Failed to process: ${error.message}`);
                 }
             }
 
-            statusText.textContent = `Extraction Complete. Processed ${tasks.length} source(s).`;
+            statusText.textContent = `Extraction Complete. Processed ${selectedFiles.length} file(s).`;
             spinner.classList.add('hidden');
             resultsContainer.classList.remove('hidden');
             if (totalPeopleFound > 0) exportBtn.classList.remove('hidden');
             else noPeopleFound.classList.remove('hidden');
-            validateInputs();
+            extractBtn.disabled = false;
         });
 
         async function extractTextFromPdf(file) {
@@ -326,11 +216,11 @@
             });
         }
 
-        async function findDataWithGemini(payload) {
+        async function findDataWithGemini(fullText, firstPageText, fileName) {
             const response = await fetch('/api/fetch-data', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ text: fullText, firstPageText: firstPageText, fileName: fileName })
             });
             if (!response.ok) {
                 const err = await response.json();
@@ -349,18 +239,18 @@
             }
         }
         
-        function displayFileHeader(task, docInfo, message = '') {
+        function displayFileHeader(file, docInfo, message = '') {
             const headerRow = resultsTbody.insertRow();
             headerRow.className = 'file-header-row';
             const cell = headerRow.insertCell();
             cell.colSpan = 8;
-            let headerText = `Source: ${task.name} | Company: ${docInfo.companyName} | RFP: ${docInfo.rfpNumber} | Item: ${docInfo.itemNumber}`;
+            let headerText = `File: ${file.name} | Company: ${docInfo.companyName} | RFP: ${docInfo.rfpNumber} | Item: ${docInfo.itemNumber}`;
             if (message) headerText += ` | Status: ${message}`;
             cell.textContent = headerText;
         }
 
-        function displayResultsForFile(task, extractedData) {
-            displayFileHeader(task, extractedData);
+        function displayResultsForFile(file, extractedData) {
+            displayFileHeader(file, extractedData);
             if (extractedData.people && extractedData.people.length > 0) {
                 extractedData.people.forEach(person => {
                     const row = resultsTbody.insertRow();
