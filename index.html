@@ -347,49 +347,54 @@
         }
 
         function exportTableToCsv(filename) {
-            let csv = [];
-            const formatCsvField = (field) => {
-                let data = field ? field.toString() : '';
-                data = data.replace(/"/g, '""');
-                if (data.includes(',')) data = `"${data}"`;
-                return data;
-            };
-            const headerRow = document.querySelector("#results-table thead tr");
-            const headerData = [];
-            headerRow.querySelectorAll("th").forEach(th => headerData.push(formatCsvField(th.innerText)));
-            csv.push(headerData.join(","));
-            const dataRows = document.querySelectorAll("#results-table tbody tr");
-            for (const row of dataRows) {
-                if (row.classList.contains('file-header-row')) {
-                    csv.push('');
-                    const headerText = row.cells[0].textContent;
-                    const parts = headerText.split('|').map(p => p.trim());
-                    parts.forEach(part => {
-                        const [key, ...value] = part.split(':');
-                        csv.push(`${formatCsvField(key.trim())},${formatCsvField(value.join(':').trim())}`);
-                    });
-                    csv.push('');
-                } else {
-                    const cols = row.querySelectorAll("td");
-                    const rowData = [];
-                    cols.forEach(col => {
-                        let data;
-                        const link = col.querySelector('a');
-                        if (link) data = link.href;
-                        else data = col.innerText;
-                        rowData.push(formatCsvField(data));
-                    });
-                    if(rowData.length > 1) csv.push(rowData.join(","));
+            try {
+                let csv = [];
+                const formatCsvField = (field) => {
+                    let data = field ? field.toString() : '';
+                    data = data.replace(/"/g, '""');
+                    if (data.includes(',')) data = `"${data}"`;
+                    return data;
+                };
+                const headerRow = document.querySelector("#results-table thead tr");
+                const headerData = [];
+                headerRow.querySelectorAll("th").forEach(th => headerData.push(formatCsvField(th.innerText)));
+                csv.push(headerData.join(","));
+                const dataRows = document.querySelectorAll("#results-table tbody tr");
+                for (const row of dataRows) {
+                    if (row.classList.contains('file-header-row')) {
+                        csv.push('');
+                        const headerText = row.cells[0].textContent;
+                        const parts = headerText.split('|').map(p => p.trim());
+                        parts.forEach(part => {
+                            const [key, ...value] = part.split(':');
+                            csv.push(`${formatCsvField(key.trim())},${formatCsvField(value.join(':').trim())}`);
+                        });
+                        csv.push('');
+                    } else {
+                        const cols = row.querySelectorAll("td");
+                        const rowData = [];
+                        cols.forEach(col => {
+                            let data;
+                            const link = col.querySelector('a');
+                            if (link) data = link.href;
+                            else data = col.innerText;
+                            rowData.push(formatCsvField(data));
+                        });
+                        if(rowData.length > 1) csv.push(rowData.join(","));
+                    }
                 }
+                const csvFile = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+                const downloadLink = document.createElement("a");
+                downloadLink.download = filename;
+                downloadLink.href = window.URL.createObjectURL(csvFile);
+                downloadLink.style.display = "none";
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            } catch (error) {
+                console.error("Export failed:", error);
+                showError(`Could not export the data. Error: ${error.message}`);
             }
-            const csvFile = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
-            const downloadLink = document.createElement("a");
-            downloadLink.download = filename;
-            downloadLink.href = window.URL.createObjectURL(csvFile);
-            downloadLink.style.display = "none";
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
         }
     </script>
 </body>
