@@ -142,10 +142,52 @@
         pdfUpload.addEventListener('change', (event) => handleFiles(event.target.files));
         fileInputLabel.addEventListener('dragover', (event) => { event.preventDefault(); fileInputLabel.classList.add('dragover'); });
         fileInputLabel.addEventListener('dragleave', () => fileInputLabel.classList.remove('dragover'));
-        fileInputLabel.addEventListener('drop', (event) => {
+        
+        // Updated drop handler to process folders
+        fileInputLabel.addEventListener('drop', async (event) => {
             event.preventDefault();
             fileInputLabel.classList.remove('dragover');
-            handleFiles(event.dataTransfer.files);
+            
+            const items = event.dataTransfer.items;
+            const files = [];
+
+            async function traverseFileTree(item) {
+                if (item.isFile) {
+                    await new Promise(resolve => {
+                        item.file(file => {
+                            if (file.type === 'application/pdf') {
+                                files.push(file);
+                            }
+                            resolve();
+                        });
+                    });
+                } else if (item.isDirectory) {
+                    const dirReader = item.createReader();
+                    const entries = await new Promise(resolve => dirReader.readEntries(resolve));
+                    for (const entry of entries) {
+                        await traverseFileTree(entry);
+                    }
+                }
+            }
+
+            const promises = [];
+            if (items && items.length > 0) {
+                 for (let i = 0; i < items.length; i++) {
+                    const entry = items[i].webkitGetAsEntry();
+                    if (entry) {
+                        promises.push(traverseFileTree(entry));
+                    }
+                }
+            }
+            
+            // Handle case where only files are dropped, not a folder
+            if (promises.length === 0 && event.dataTransfer.files.length > 0) {
+                 handleFiles(event.dataTransfer.files);
+                 return;
+            }
+
+            await Promise.all(promises);
+            handleFiles(files);
         });
 
         // --- Main Extraction Logic ---
@@ -260,7 +302,7 @@
                     createCell(row, person.company || 'N/A');
                     createCell(row, person.is_pe || 'No');
                     createCell(row, person.discipline || 'N/A');
-                    createCell(row, person.yoe || '0');
+                    createCell(row, person.yoe || 'N/A');
                     createCell(row, person.role || 'N/A');
                     createCell(row, person.location || 'N/A');
                 });

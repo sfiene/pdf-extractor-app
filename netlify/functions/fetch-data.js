@@ -26,7 +26,7 @@ For each person in the 'people' array, extract the following fields:
 - **company**: The company they work for. If it's the same as the main companyName you identified, use that.
 - **is_pe**: A string, "Yes" if they have a "PE" designation, otherwise "No".
 - **discipline**: Their engineering or professional discipline (e.g., "Roadway", "Hydraulics", "Pavement", "Bridge", "Project Management"). If not clear, use "N/A".
-- **yoe**: The person's total years of professional experience as a number. If not found, use 0.
+- **yoe**: The person's total years of professional experience as a number. If not found, use "N/A".
 - **location**: Their office location (City, State) if mentioned. If not found, use "N/A".
 
 If a top-level field (like rfpNumber) is not found, its value should be "N/A". If no people are found, the 'people' array should be empty.
@@ -55,13 +55,19 @@ ${text}
         if (parsedJson.people && Array.isArray(parsedJson.people)) {
             parsedJson.people.forEach(person => {
                 const yoe = parseInt(person.yoe, 10);
-                if (isNaN(yoe)) person.role = 'N/A';
-                else if (yoe <= 1) person.role = 'entry';
-                else if (yoe <= 4) person.role = 'junior';
-                else if (yoe <= 8) person.role = 'mid';
-                else if (yoe <= 12) person.role = 'senior';
-                else if (yoe <= 15) person.role = 'lead';
-                else person.role = 'principle';
+
+                if (isNaN(yoe) || person.yoe === 'N/A' || person.yoe === null) {
+                    person.yoe = 'N/A';
+                    person.role = 'N/A';
+                } else {
+                    person.yoe = yoe; // Ensure it's a number for consistency
+                    if (yoe <= 1) person.role = 'entry';
+                    else if (yoe <= 4) person.role = 'junior';
+                    else if (yoe <= 8) person.role = 'mid';
+                    else if (yoe <= 12) person.role = 'senior';
+                    else if (yoe <= 15) person.role = 'lead';
+                    else person.role = 'principle';
+                }
             });
         }
         result.candidates[0].content.parts[0].text = JSON.stringify(parsedJson);
