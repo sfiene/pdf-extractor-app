@@ -230,6 +230,10 @@
             else noPeopleFound.classList.remove('hidden');
             extractBtn.disabled = false;
         });
+        
+        exportBtn.addEventListener('click', () => {
+            exportTableToCsv('extracted_data.csv');
+        });
 
         async function extractTextFromPdf(file) {
             const reader = new FileReader();
@@ -356,9 +360,12 @@
                     return data;
                 };
                 const headerRow = document.querySelector("#results-table thead tr");
+                if (!headerRow) throw new Error("Results table header not found.");
+
                 const headerData = [];
                 headerRow.querySelectorAll("th").forEach(th => headerData.push(formatCsvField(th.innerText)));
                 csv.push(headerData.join(","));
+                
                 const dataRows = document.querySelectorAll("#results-table tbody tr");
                 for (const row of dataRows) {
                     if (row.classList.contains('file-header-row')) {
